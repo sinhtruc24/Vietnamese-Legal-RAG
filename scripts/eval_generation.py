@@ -133,7 +133,8 @@ def main() -> None:
 
             llm = HFGenerator(args.llm_model, args.adapter)
         else:
-            llm = OpenAICompatibleGenerator(args.llm_base_url, args.llm_model, os.environ.get("LLM_API_KEY", "EMPTY"))
+            llm = OpenAICompatibleGenerator(args.llm_base_url, args.llm_model, os.environ.get("LLM_API_KEY", "EMPTY"),
+                                            max_tokens=2048)
         retriever = bundle.retriever(args.retriever)
         samples = [
             sample_context(q, ds.queries[q], qrels[q], bundle.articles, retriever,
@@ -171,7 +172,7 @@ def main() -> None:
 
     if args.judge_model:
         judge = OpenAICompatibleGenerator(args.judge_base_url or args.llm_base_url, args.judge_model,
-                                          os.environ.get("JUDGE_API_KEY", "EMPTY"), temperature=0.0, max_tokens=200)
+                                          os.environ.get("JUDGE_API_KEY", "EMPTY"), temperature=0.0, max_tokens=1024)
         todo = [r for r in rows if not r["refused"]]
         with ThreadPoolExecutor(args.workers) as pool:
             verdicts = list(tqdm(pool.map(lambda r: judge_faithfulness(judge, r["context"], r["answer"]), todo),

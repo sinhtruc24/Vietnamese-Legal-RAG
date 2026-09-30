@@ -34,6 +34,14 @@ from legalrag.prompts import REFUSAL, is_refusal, parse_citations
 from legalrag.sampling import sample_context
 
 
+FATAL_STATUS = {
+    400: "Kiểm tra --teacher-model (tên model) và --teacher-base-url.",
+    401: "API key sai hoặc không khớp nhà cung cấp: key Gemini phải đi với endpoint Gemini, key OpenAI với endpoint OpenAI.",
+    403: "Key không có quyền dùng model/endpoint này.",
+    404: "Sai --teacher-base-url hoặc tên model không tồn tại.",
+}
+
+
 def label(sample: dict, teacher) -> dict | None:
     """Attach the target answer, or return None if the teacher output is unusable."""
     if sample["type"] == "negative":
@@ -62,6 +70,8 @@ def main() -> None:
     parser.add_argument("--val-ratio", type=float, default=0.05)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--max-tokens", type=int, default=2048,
+                        help="teacher output budget; reasoning models spend part of it thinking")
     parser.add_argument("--seed", type=int, default=13)
     args = parser.parse_args()
 
@@ -69,7 +79,7 @@ def main() -> None:
 
     teacher = OpenAICompatibleGenerator(
         args.teacher_base_url, args.teacher_model,
-        api_key=os.environ.get("TEACHER_API_KEY", "EMPTY"), temperature=0.2, max_tokens=600,
+        api_key=os.environ.get("TEACHER_API_KEY", "EMPTY"), temperature=0.2, max_tokens=args.max_tokens,
     )
     ds = LegalDataset.load(args.data_dir)
     bundle = IndexBundle(args.index_dir)
@@ -91,14 +101,20 @@ def main() -> None:
     ]
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    rejected = 0
+    rejected = errors = 0
     with open(raw_path, "a", encoding="utf-8") as out, ThreadPoolExecutor(args.workers) as pool:
         futures = [pool.submit(label, s, teacher) for s in samples]
         for future in tqdm(as_completed(futures), total=len(futures), desc="teacher"):
             try:
                 row = future.result()
-            except Exception as exc:  # network/API error: skipped now, retried on the next run
-                print(f"error: {exc}")
+            except Exception as exc:
+                status = getattr(exc, "status_code", None)
+                if status in FATAL_STATUS:  # wrong key / URL / model: every call would fail the same way
+                    pool.shutdown(cancel_futures=True)
+                    raise SystemExit(f"\nTeacher API error {status}: {exc}\n{FATAL_STATUS[status]}") from None
+                errors += 1  # transient (rate limit, network): skipped now, retried on the next run
+                if errors <= 3:
+                    print(f"error: {exc}")
                 continue
             if row is None:
                 rejected += 1
@@ -112,7 +128,8 @@ def main() -> None:
     write_jsonl(args.out_dir / "val.jsonl", rows[:n_val])
     write_jsonl(args.out_dir / "train.jsonl", rows[n_val:])
     kinds = {k: sum(r["type"] == k for r in rows) for k in ("answerable", "negative")}
-    print(f"rejected this run: {rejected} | kept: {len(rows)} {kinds} | train {len(rows) - n_val} / val {n_val}")
+    print(f"rejected this run: {rejected} | API errors: {errors} (rerun to retry) | "
+          f"kept: {len(rows)} {kinds} | train {len(rows) - n_val} / val {n_val}")
 
 
 if __name__ == "__main__":
