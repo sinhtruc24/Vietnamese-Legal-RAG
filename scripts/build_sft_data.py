@@ -70,16 +70,19 @@ def main() -> None:
     parser.add_argument("--val-ratio", type=float, default=0.05)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--rpm", type=float, default=None,
+                        help="max teacher requests per minute (free tiers: e.g. 4); default unlimited")
     parser.add_argument("--max-tokens", type=int, default=2048,
                         help="teacher output budget; reasoning models spend part of it thinking")
     parser.add_argument("--seed", type=int, default=13)
     args = parser.parse_args()
 
-    from legalrag.generator import OpenAICompatibleGenerator
+    from legalrag.generator import OpenAICompatibleGenerator, QuotaExhausted
 
     teacher = OpenAICompatibleGenerator(
         args.teacher_base_url, args.teacher_model,
         api_key=os.environ.get("TEACHER_API_KEY", "EMPTY"), temperature=0.2, max_tokens=args.max_tokens,
+        requests_per_minute=args.rpm,
     )
     ds = LegalDataset.load(args.data_dir)
     bundle = IndexBundle(args.index_dir)
@@ -107,6 +110,11 @@ def main() -> None:
         for future in tqdm(as_completed(futures), total=len(futures), desc="teacher"):
             try:
                 row = future.result()
+            except QuotaExhausted:
+                pool.shutdown(cancel_futures=True)
+                print("\nHết quota trong ngày của teacher. Dữ liệu đã làm được vẫn được giữ; "
+                      "chạy lại lệnh này sau khi quota reset, script sẽ làm tiếp phần còn lại.")
+                break
             except Exception as exc:
                 status = getattr(exc, "status_code", None)
                 if status in FATAL_STATUS:  # wrong key / URL / model: every call would fail the same way

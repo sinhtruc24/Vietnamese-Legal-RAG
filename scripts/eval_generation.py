@@ -48,7 +48,11 @@ CÂU TRẢ LỜI:
 
 
 def judge_faithfulness(judge, context: str, answer: str) -> bool | None:
-    raw = judge.generate([{"role": "user", "content": JUDGE_PROMPT.format(context=context, answer=answer)}])
+    try:
+        raw = judge.generate([{"role": "user", "content": JUDGE_PROMPT.format(context=context, answer=answer)}])
+    except Exception as exc:  # quota / network: leave this sample unjudged instead of losing the run
+        print(f"judge error: {str(exc)[:200]}")
+        return None
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     try:
         return bool(json.loads(match.group(0))["faithful"]) if match else None
@@ -110,6 +114,7 @@ def main() -> None:
     parser.add_argument("--adapter", default=None, help="LoRA adapter dir (--backend hf)")
     parser.add_argument("--judge-base-url", default=None)
     parser.add_argument("--judge-model", default=None)
+    parser.add_argument("--rpm", type=float, default=None, help="max API requests per minute (LLM and judge)")
     parser.add_argument("--n-contexts", type=int, default=3)
     parser.add_argument("--neg-ratio", type=float, default=0.2)
     parser.add_argument("--limit", type=int, default=300)
@@ -134,7 +139,7 @@ def main() -> None:
             llm = HFGenerator(args.llm_model, args.adapter)
         else:
             llm = OpenAICompatibleGenerator(args.llm_base_url, args.llm_model, os.environ.get("LLM_API_KEY", "EMPTY"),
-                                            max_tokens=2048)
+                                            max_tokens=2048, requests_per_minute=args.rpm)
         retriever = bundle.retriever(args.retriever)
         samples = [
             sample_context(q, ds.queries[q], qrels[q], bundle.articles, retriever,
@@ -172,7 +177,8 @@ def main() -> None:
 
     if args.judge_model:
         judge = OpenAICompatibleGenerator(args.judge_base_url or args.llm_base_url, args.judge_model,
-                                          os.environ.get("JUDGE_API_KEY", "EMPTY"), temperature=0.0, max_tokens=1024)
+                                          os.environ.get("JUDGE_API_KEY", "EMPTY"), temperature=0.0, max_tokens=1024,
+                                          requests_per_minute=args.rpm)
         todo = [r for r in rows if not r["refused"]]
         with ThreadPoolExecutor(args.workers) as pool:
             verdicts = list(tqdm(pool.map(lambda r: judge_faithfulness(judge, r["context"], r["answer"]), todo),
