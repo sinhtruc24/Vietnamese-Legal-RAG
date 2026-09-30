@@ -1,0 +1,2 @@
+# Retrieval, API and demo (install PyTorch first if you want a CUDA build)
+-e .[ml,serve,dev]

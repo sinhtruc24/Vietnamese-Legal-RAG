@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+*.egg-info/
+
+# large artifacts
+data/
+indexes/
+outputs/
+results/gen_*.jsonl

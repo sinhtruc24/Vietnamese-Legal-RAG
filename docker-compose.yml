@@ -1,0 +1,53 @@
+# Full stack: vLLM (base model + LoRA adapter) -> RAG API -> Gradio UI.
+# Requires an NVIDIA GPU + nvidia-container-toolkit for the `llm` service.
+# Without a GPU, drop `llm` and point LLM_BASE_URL at any OpenAI-compatible endpoint.
+services:
+  llm:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model=Qwen/Qwen2.5-3B-Instruct
+      - --enable-lora
+      - --lora-modules=legal-lora=/adapters/legal-lora
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.85
+    volumes:
+      - ./outputs/qwen-legal-lora/adapter:/adapters/legal-lora:ro
+      - hf-cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  api:
+    build: .
+    environment:
+      INDEX_DIR: /app/indexes/full
+      RETRIEVER: hybrid
+      USE_RERANKER: "true"
+      LLM_BASE_URL: http://llm:8000/v1
+      LLM_MODEL: legal-lora  # or Qwen/Qwen2.5-3B-Instruct for the base model
+    volumes:
+      - ./indexes:/app/indexes:ro
+      - hf-cache:/root/.cache/huggingface
+    ports:
+      - "8080:8080"
+    depends_on:
+      - llm
+
+  ui:
+    build: .
+    command: ["python", "app/ui.py"]
+    environment:
+      API_URL: http://api:8080
+    ports:
+      - "7860:7860"
+    depends_on:
+      - api
+
+volumes:
+  hf-cache:
