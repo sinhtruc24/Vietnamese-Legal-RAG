@@ -1,0 +1,15 @@
+{
+  "split": "test",
+  "n_queries": 788,
+  "index_dir": "indexes/full",
+  "results": {
+    "hybrid+rerank": {
+      "recall@1": 0.6941624365482234,
+      "recall@5": 0.9321065989847716,
+      "recall@10": 0.9581218274111675,
+      "mrr@10": 0.7971789138667311,
+      "ndcg@10": 0.8362881678121645,
+      "ms_per_query": 643.8160249695432
+    }
+  }
+}

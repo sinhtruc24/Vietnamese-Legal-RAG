@@ -29,13 +29,30 @@ Bộ dữ liệu **không có câu trả lời mẫu**, nên phần sinh câu tr
 
 | Phương pháp | Recall@1 | Recall@5 | Recall@10 | MRR@10 | nDCG@10 | ms/query |
 |---|---|---|---|---|---|---|
-| BM25 (âm tiết) | 0.558 | 0.805 | 0.859 | 0.667 | 0.714 | 4 (CPU) |
-| BM25 + bigram âm tiết | **0.623** | **0.852** | **0.890** | **0.724** | **0.765** | 5 (CPU) |
-| Dense (bge-m3) | _TODO_ | | | | | |
-| Hybrid (RRF) | _TODO_ | | | | | |
-| Hybrid + reranker | _TODO_ | | | | | |
+| BM25 (âm tiết) | 0.558 | 0.805 | 0.859 | 0.667 | 0.714 | 4 |
+| BM25 + bigram âm tiết | 0.626 | 0.852 | 0.890 | 0.726 | 0.766 | 2 |
+| Dense (bge-m3) | 0.626 | 0.873 | 0.925 | 0.733 | 0.779 | 17 |
+| Hybrid (BM25 + dense, RRF) | 0.687 | 0.895 | 0.938 | 0.779 | 0.818 | 19 |
+| **Hybrid + reranker (top-30)** | **0.697** | **0.932** | **0.963** | **0.800** | **0.840** | 410 |
+| Dense + reranker (top-30) | 0.698 | 0.919 | 0.949 | 0.795 | 0.832 | 411 |
 
-> Bigram âm tiết giúp BM25 xấp xỉ việc tách từ tiếng Việt ("xử_phạt", "lao_động") và tăng Recall@1 thêm **+6.5 điểm** mà không cần thư viện tách từ.
+BM25 chạy trên CPU; dense và reranker chạy trên Kaggle T4, thời gian tính trung bình khi chạy theo batch.
+
+**Số ứng viên đưa vào reranker** (hybrid + reranker):
+
+| Số ứng viên | Recall@5 | Recall@10 | ms/query |
+|---|---|---|---|
+| 10 | 0.918 | 0.938 | 161 |
+| 20 | 0.928 | 0.959 | 287 |
+| 30 | **0.932** | **0.963** | 410 |
+| 50 | 0.932 | 0.958 | 644 |
+
+**Nhận xét:**
+- **Bigram âm tiết** giúp BM25 xấp xỉ việc tách từ tiếng Việt ("xử_phạt", "lao_động") và tăng Recall@1 thêm **6.8 điểm** mà không cần thư viện tách từ. Sau khi có bigram, BM25 ngang dense ở Recall@1 nhưng nhanh hơn khoảng 10 lần.
+- **Hybrid hơn hẳn từng phương pháp riêng lẻ** (Recall@1 tăng 6 điểm). BM25 bắt tốt thuật ngữ và số hiệu chính xác, còn dense bắt tốt câu hỏi diễn đạt khác văn bản luật, nên hai cách bổ sung cho nhau.
+- **Reranker chủ yếu kéo điều luật đúng vào top-5** (Recall@5 từ 0.895 lên 0.932), còn Recall@1 gần như không đổi. Với RAG như vậy là đủ, vì LLM nhận top-3 làm ngữ cảnh. Đổi lại, độ trễ tăng khoảng 20 lần.
+- **Từ 30 ứng viên trở lên thì không tăng thêm**, chỉ tốn thêm thời gian. Mức 20 giữ được gần như toàn bộ chất lượng mà nhanh hơn 30%, nên tôi chọn 20 làm mặc định khi demo.
+- **Recall@1 dừng ở khoảng 0.70**, trong khi gần như mọi câu test chỉ có 1 điều luật đúng (mức tối đa đạt được là 0.997). Hướng cải thiện tiếp theo là fine-tune reranker hoặc embedding trên khoảng 2.4K cặp câu hỏi và điều luật đúng của tập train.
 
 ### Sinh câu trả lời (chế độ oracle, 300 câu test, cùng ngữ cảnh cho mọi mô hình)
 
@@ -154,7 +171,7 @@ python app/ui.py
 ## Lộ trình 4 tuần
 
 - [x] **Tuần 0:** khung project, BM25 + bigram, metrics, test, số liệu baseline BM25
-- [ ] **Tuần 1:** dense index bge-m3 trên Kaggle; bảng BM25 / dense / hybrid / +reranker; thử `CONTEXT_K`, chunk size
+- [x] **Tuần 1:** dense index bge-m3 trên Kaggle; bảng BM25 / dense / hybrid / +reranker; ablation số ứng viên reranker
 - [ ] **Tuần 2:** tạo dữ liệu SFT (~2K mẫu), kiểm tra tay khoảng 50 mẫu, train QLoRA
 - [ ] **Tuần 3:** đánh giá base với LoRA với teacher; phân tích lỗi (câu nào sai, vì sao); ablation `neg_ratio`
 - [ ] **Tuần 4:** Docker, demo, README hoàn chỉnh, quay GIF demo, đưa lên CV

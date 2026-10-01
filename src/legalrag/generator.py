@@ -54,11 +54,12 @@ class OpenAICompatibleGenerator:
         requests_per_minute: float | None = None,
         rate_limit_retries: int = 5,
     ):
-        from openai import OpenAI, RateLimitError
+        from openai import InternalServerError, OpenAI, RateLimitError
 
-        # 429s are handled below (the provider tells us how long to wait); the SDK retries the rest.
+        # 429 and 5xx are retried below with provider-aware waits; the SDK only retries connection errors quickly.
         self.client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=2)
         self._rate_limit_error = RateLimitError
+        self._server_error = InternalServerError
         self.limiter = RateLimiter(requests_per_minute)
         self.rate_limit_retries = rate_limit_retries
         self.model = model
@@ -83,6 +84,10 @@ class OpenAICompatibleGenerator:
                 if attempt == self.rate_limit_retries:
                     raise
                 time.sleep(_retry_delay(text) + 1.0)
+            except self._server_error:  # 5xx, e.g. 503 "model overloaded": usually clears within a minute
+                if attempt == self.rate_limit_retries:
+                    raise
+                time.sleep(min(10.0 * 2**attempt, 120.0))
         raise AssertionError("unreachable")
 
 
