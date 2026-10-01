@@ -12,13 +12,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
-import torch
-from datasets import load_dataset
-from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from trl import SFTConfig, SFTTrainer
+# Train on a single GPU. With 2 visible GPUs (Kaggle "T4 x2") Trainer wraps the model in
+# nn.DataParallel, and replicating a bitsandbytes 4-bit model crashes with "illegal memory access".
+# Must be set before torch initialises CUDA.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+
+import torch  # noqa: E402
+from datasets import load_dataset  # noqa: E402
+from peft import LoraConfig  # noqa: E402
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig  # noqa: E402
+from trl import SFTConfig, SFTTrainer  # noqa: E402
 
 LORA_TARGETS = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 
