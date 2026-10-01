@@ -57,18 +57,27 @@ def main() -> None:
             bnb_4bit_compute_dtype=compute_dtype,
         ),
         torch_dtype=compute_dtype,
-        device_map="auto",
+        # A 4-bit 3B model fits on one T4. Splitting it across GPUs ("auto") is slower and wraps
+        # forward() in accelerate hooks, which breaks TRL's forward patching.
+        device_map={"": 0} if torch.cuda.is_available() else None,
     )
 
     data = load_dataset("json", data_files={"train": str(args.train), "validation": str(args.val)})
     data = data.select_columns(["prompt", "completion"])
+
+    steps_per_epoch = -(-len(data["train"]) // (args.batch_size * args.grad_accum))
+    extra = {}
+    if "loss_type" in SFTConfig.__dataclass_fields__:
+        # Newer TRL defaults to "chunked_nll", which patches model.forward and fails on hooked/quantized
+        # models; plain NLL is the same objective.
+        extra["loss_type"] = "nll"
 
     config = SFTConfig(
         output_dir=str(args.output_dir),
         num_train_epochs=args.epochs,
         learning_rate=args.lr,
         lr_scheduler_type="cosine",
-        warmup_ratio=0.03,
+        warmup_steps=max(1, int(0.03 * steps_per_epoch * args.epochs)),
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
@@ -86,6 +95,7 @@ def main() -> None:
         metric_for_best_model="eval_loss",
         report_to="none",
         seed=args.seed,
+        **extra,
     )
     trainer = SFTTrainer(
         model=model,

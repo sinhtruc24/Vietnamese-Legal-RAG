@@ -105,16 +105,21 @@ def main() -> None:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     rejected = errors = 0
+    quota_exhausted = False
     with open(raw_path, "a", encoding="utf-8") as out, ThreadPoolExecutor(args.workers) as pool:
         futures = [pool.submit(label, s, teacher) for s in samples]
         for future in tqdm(as_completed(futures), total=len(futures), desc="teacher"):
+            # After the quota runs out keep draining: answers that already finished must still be saved.
+            if future.cancelled():
+                continue
             try:
                 row = future.result()
             except QuotaExhausted:
-                pool.shutdown(cancel_futures=True)
-                print("\nHết quota trong ngày của teacher. Dữ liệu đã làm được vẫn được giữ; "
-                      "chạy lại lệnh này sau khi quota reset, script sẽ làm tiếp phần còn lại.")
-                break
+                if not quota_exhausted:
+                    quota_exhausted = True
+                    for pending in futures:
+                        pending.cancel()
+                continue
             except Exception as exc:
                 status = getattr(exc, "status_code", None)
                 if status in FATAL_STATUS:  # wrong key / URL / model: every call would fail the same way
@@ -130,6 +135,9 @@ def main() -> None:
             out.write(json.dumps(row, ensure_ascii=False) + "\n")
             out.flush()
 
+    if quota_exhausted:
+        print("\nHết quota trong ngày của teacher. Dữ liệu đã làm được vẫn được giữ; "
+              "chạy lại lệnh này sau khi quota reset, script sẽ làm tiếp phần còn lại.")
     rows = list(read_jsonl(raw_path))
     random.Random(args.seed).shuffle(rows)
     n_val = max(1, int(len(rows) * args.val_ratio))
