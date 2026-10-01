@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 from pathlib import Path
 
 WORLD_SIZE = int(os.environ.get("WORLD_SIZE", "1"))
@@ -109,8 +110,9 @@ def main() -> None:
         eval_steps=args.save_steps,
         save_strategy="steps",
         save_steps=args.save_steps,
-        save_total_limit=2,
-        load_best_model_at_end=True,
+        # Keep every checkpoint (~120 MB each) and pick the best one ourselves below:
+        # load_best_model_at_end reloads the adapter through peft's tensor-parallel path, which
+        # crashes on some peft/transformers combinations (ImportError: EmbeddingParallel).
         metric_for_best_model="eval_loss",
         report_to="none",
         seed=args.seed,
@@ -141,12 +143,27 @@ def main() -> None:
     trainer.train(resume_from_checkpoint=True if resume else None)
 
     adapter_dir = args.output_dir / "adapter"
-    trainer.save_model(str(adapter_dir))
+    best = trainer.state.best_model_checkpoint
+    if best is None:  # no evaluation ran: keep the final weights
+        trainer.save_model(str(adapter_dir))
     if trainer.is_world_process_zero():
+        if best is not None:
+            export_adapter(Path(best), adapter_dir)
+            print(f"best checkpoint: {best} (eval_loss={trainer.state.best_metric:.4f})")
         tokenizer.save_pretrained(str(adapter_dir))
         history = [h for h in trainer.state.log_history if "eval_loss" in h]
         (args.output_dir / "eval_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
         print(f"adapter saved to {adapter_dir}")
+
+
+def export_adapter(checkpoint: Path, adapter_dir: Path) -> None:
+    """Copy the LoRA weights + config of a Trainer checkpoint into a standalone adapter folder."""
+    adapter_dir.mkdir(parents=True, exist_ok=True)
+    files = list(checkpoint.glob("adapter_*"))
+    if not files:
+        raise FileNotFoundError(f"no adapter_* files in {checkpoint}")
+    for file in files:
+        shutil.copy(file, adapter_dir / file.name)
 
 
 if __name__ == "__main__":
