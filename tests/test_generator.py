@@ -27,7 +27,10 @@ def test_rate_limiter_disabled_is_free():
 def _fake_generator(monkeypatch, errors):
     """Generator whose API call raises the given errors in order, then succeeds."""
     openai = __import__("pytest").importorskip("openai")
-    import httpx
+    try:  # openai >= 3 is built on httpx2
+        import httpx2 as httpx
+    except ImportError:
+        import httpx
 
     from legalrag import generator as gen
 

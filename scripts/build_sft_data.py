@@ -35,7 +35,7 @@ from legalrag.sampling import sample_context
 
 
 FATAL_STATUS = {
-    400: "Kiểm tra --teacher-model (tên model) và --teacher-base-url.",
+    400: "Kiểm tra API key (Gemini báo key sai bằng lỗi 400), --teacher-model và --teacher-base-url.",
     401: "API key sai hoặc không khớp nhà cung cấp: key Gemini phải đi với endpoint Gemini, key OpenAI với endpoint OpenAI.",
     403: "Key không có quyền dùng model/endpoint này.",
     404: "Sai --teacher-base-url hoặc tên model không tồn tại.",
