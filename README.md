@@ -168,6 +168,7 @@ tests/           pytest, chạy trên CPU, không cần tải model
 |---|---|---|
 | [notebooks/01_retrieval_kaggle.ipynb](notebooks/01_retrieval_kaggle.ipynb) | Dense index bge-m3, bảng so sánh BM25 / dense / hybrid / reranker | khoảng 1 giờ |
 | [notebooks/02_sft_qlora_eval_kaggle.ipynb](notebooks/02_sft_qlora_eval_kaggle.ipynb) | Tạo dữ liệu SFT, train QLoRA, đánh giá base / LoRA / teacher, phân tích lỗi | 2–4 giờ |
+| [notebooks/03_demo_kaggle.ipynb](notebooks/03_demo_kaggle.ipynb) | Chạy demo trên GPU Kaggle (LoRA v2 + cổng từ chối), mở qua link công khai gradio.live | khoảng 25 phút để khởi động |
 
 Các bước: Kaggle → **Create → Import Notebook** → chọn file `.ipynb` → Settings: **GPU T4 x2**, **Internet On** → thêm Secret `TEACHER_API_KEY` (chỉ notebook 02 cần) → **Run All** → **Save Version** để lưu output. Notebook tự clone repo từ GitHub nên luôn chạy code mới nhất.
 

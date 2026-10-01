@@ -46,11 +46,19 @@ class IndexBundle:
 
 
 def build_pipeline(settings: Settings, bundle: IndexBundle | None = None):
-    from .generator import OpenAICompatibleGenerator
     from .pipeline import RAGPipeline
 
     bundle = bundle or IndexBundle(settings.index_dir, settings.device)
-    generator = OpenAICompatibleGenerator(settings.llm_base_url, settings.llm_model, settings.llm_api_key)
+    if settings.llm_backend == "hf":
+        from .generator import HFGenerator
+
+        generator = HFGenerator(settings.llm_model, settings.llm_adapter)
+    elif settings.llm_backend == "openai":
+        from .generator import OpenAICompatibleGenerator
+
+        generator = OpenAICompatibleGenerator(settings.llm_base_url, settings.llm_model, settings.llm_api_key)
+    else:
+        raise ValueError(f"Unknown LLM_BACKEND '{settings.llm_backend}' (expected openai or hf)")
     return RAGPipeline(
         retriever=bundle.retriever(settings.retriever),
         generator=generator,

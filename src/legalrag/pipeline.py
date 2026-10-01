@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Mapping, Sequence
 
 from .data import Article, format_citation
@@ -38,6 +38,18 @@ class RAGAnswer:
     timings_ms: dict[str, float] = field(default_factory=dict)
     gated: bool = False  # refused by the reranker gate, the LLM was not called
     top_score: float | None = None  # reranker score of the best article
+
+    def to_dict(self) -> dict:
+        return {
+            "question": self.question,
+            "answer": self.answer,
+            "refused": self.refused,
+            "gated": self.gated,
+            "top_score": self.top_score,
+            "citations": self.citations,
+            "contexts": [asdict(d) for d in self.contexts],
+            "timings_ms": {k: round(v, 1) for k, v in self.timings_ms.items()},
+        }
 
 
 class RAGPipeline:

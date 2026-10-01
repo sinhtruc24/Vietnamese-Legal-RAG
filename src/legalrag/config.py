@@ -26,9 +26,11 @@ class Settings:
     max_context_chars: int = 1500
     refusal_threshold: float | None = None  # reranker-score gate, see scripts/tune_refusal_gate.py
 
+    llm_backend: str = "openai"  # openai: any OpenAI-compatible server | hf: load the model in-process
     llm_base_url: str = "http://localhost:8000/v1"
     llm_model: str = "Qwen/Qwen2.5-3B-Instruct"
     llm_api_key: str = "EMPTY"
+    llm_adapter: str | None = None  # LoRA adapter dir (hf backend)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -45,7 +47,9 @@ class Settings:
             context_k=int(env("CONTEXT_K", cls.context_k)),
             max_context_chars=int(env("MAX_CONTEXT_CHARS", cls.max_context_chars)),
             refusal_threshold=float(env("REFUSAL_THRESHOLD")) if env("REFUSAL_THRESHOLD") else None,
+            llm_backend=env("LLM_BACKEND", cls.llm_backend),
             llm_base_url=env("LLM_BASE_URL", cls.llm_base_url),
             llm_model=env("LLM_MODEL", cls.llm_model),
             llm_api_key=env("LLM_API_KEY", cls.llm_api_key),
+            llm_adapter=env("LLM_ADAPTER") or None,
         )

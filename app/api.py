@@ -7,8 +7,6 @@ Configuration comes from environment variables (see legalrag/config.py and .env.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from dataclasses import asdict
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -72,13 +70,4 @@ def ask(req: AskRequest) -> dict:
         result = state["pipeline"].answer(req.question)
     except Exception as exc:  # most often: the LLM server is unreachable
         raise HTTPException(status_code=502, detail=f"generation failed: {exc}") from exc
-    return {
-        "question": result.question,
-        "answer": result.answer,
-        "refused": result.refused,
-        "gated": result.gated,
-        "top_score": result.top_score,
-        "citations": result.citations,
-        "contexts": [asdict(d) for d in result.contexts],
-        "timings_ms": {k: round(v, 1) for k, v in result.timings_ms.items()},
-    }
+    return result.to_dict()

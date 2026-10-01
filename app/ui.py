@@ -1,12 +1,23 @@
-"""Gradio demo that calls the REST API.
+"""Gradio demo.
 
+Two modes:
+    # calls the REST API (app/api.py)
     API_URL=http://localhost:8080 python app/ui.py
+
+    # runs the whole pipeline in this process, e.g. on a Kaggle GPU; --share prints a public link
+    LLM_BACKEND=hf LLM_ADAPTER=outputs/qwen-legal-lora_v2/adapter INDEX_DIR=indexes/full \
+        REFUSAL_THRESHOLD=0.67 python app/ui.py --local --share
+
+In --local mode the pipeline is configured by the same environment variables as the API
+(see legalrag/config.py and .env.example).
 """
 from __future__ import annotations
 
+import argparse
 import html
 import os
 import re
+import threading
 
 import gradio as gr
 import requests
@@ -130,15 +141,27 @@ def _render_source(i: int, doc: dict, cited: bool) -> str:
     </div>"""
 
 
+# In --local mode: the pipeline object, shared by all requests (models are not thread-safe).
+LOCAL_PIPELINE = None
+_LOCAL_LOCK = threading.Lock()
+
+
+def _query(question: str) -> dict:
+    if LOCAL_PIPELINE is not None:
+        with _LOCAL_LOCK:
+            return LOCAL_PIPELINE.answer(question).to_dict()
+    response = requests.post(f"{API_URL}/ask", json={"question": question}, timeout=180)
+    response.raise_for_status()
+    return response.json()
+
+
 def ask(question: str) -> tuple[str, str]:
     if not question or not question.strip():
         return EMPTY, ""
     try:
-        response = requests.post(f"{API_URL}/ask", json={"question": question}, timeout=180)
-        response.raise_for_status()
-        data = response.json()
-    except requests.RequestException as exc:
-        return f'<div class="card error">Không gọi được API ({html.escape(str(exc))}).</div>', ""
+        data = _query(question)
+    except Exception as exc:  # API unreachable, or a model error in local mode
+        return f'<div class="card error">Không lấy được câu trả lời ({html.escape(str(exc))}).</div>', ""
 
     docs = data["contexts"]
     cited = {c["index"] for c in data["citations"]}
@@ -196,5 +219,22 @@ def build_demo(initial_question: str = "") -> gr.Blocks:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--local", action="store_true", help="run the pipeline in this process instead of calling the API")
+    parser.add_argument("--share", action="store_true", help="create a public *.gradio.live link (e.g. from Kaggle)")
+    args = parser.parse_args()
+
+    if args.local:
+        from legalrag.config import Settings
+        from legalrag.factory import build_pipeline
+
+        settings = Settings.from_env()
+        print(f"Loading pipeline: retriever={settings.retriever}, reranker={settings.use_reranker}, "
+              f"gate={settings.refusal_threshold}, llm={settings.llm_backend}:{settings.llm_model} "
+              f"adapter={settings.llm_adapter}")
+        LOCAL_PIPELINE = build_pipeline(settings)
+        LOCAL_PIPELINE.answer("Người lao động nghỉ việc cần báo trước bao nhiêu ngày?")  # warm-up
+        print("Pipeline ready")
+
     build_demo().launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)),
-                        **(STYLE if _GRADIO6 else {}))
+                        share=args.share, **(STYLE if _GRADIO6 else {}))

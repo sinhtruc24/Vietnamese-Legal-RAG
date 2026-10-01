@@ -70,3 +70,13 @@ def test_sample_context_is_deterministic_and_contains_gold(articles, chunks):
 
     negative = sample_context(**{**args, "neg_ratio": 1.0})
     assert negative["type"] == "negative" and negative["gold"] == []
+
+
+def test_answer_to_dict_is_json_ready(articles, chunks):
+    import json
+
+    pipeline = RAGPipeline(BM25Retriever().fit(chunks), _FakeLLM("Bị phạt [1]."), articles, context_k=2)
+    data = pipeline.answer("không đội mũ bảo hiểm").to_dict()
+    assert set(data) >= {"answer", "refused", "gated", "top_score", "citations", "contexts", "timings_ms"}
+    assert data["contexts"][0]["article_id"] == "100/2019/nđ-cp+6"
+    json.dumps(data, ensure_ascii=False)  # must be serialisable for the API
