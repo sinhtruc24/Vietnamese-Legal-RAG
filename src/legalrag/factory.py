@@ -59,4 +59,5 @@ def build_pipeline(settings: Settings, bundle: IndexBundle | None = None):
         candidates=settings.candidates,
         context_k=settings.context_k,
         max_context_chars=settings.max_context_chars,
+        refusal_threshold=settings.refusal_threshold if settings.use_reranker else None,
     )

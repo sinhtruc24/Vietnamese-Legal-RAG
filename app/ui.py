@@ -146,8 +146,12 @@ def ask(question: str) -> tuple[str, str]:
     meta = " ".join(
         f"<span>{label}: {t[key] / 1000:.2f}s</span>"
         for key, label in (("retrieve", "Truy xuất"), ("rerank", "Xếp hạng lại"), ("generate", "Sinh câu trả lời"))
-        if key in t
+        if key in t and not (key == "generate" and data.get("gated"))
     )
+    if data.get("top_score") is not None:
+        meta += f"<span>Độ liên quan cao nhất: {data['top_score']:.2f}</span>"
+    if data.get("gated"):
+        meta += "<span>Từ chối ngay ở bước truy xuất (không gọi mô hình sinh)</span>"
     answer_html = f"""
     <div class="card">
       <div class="label">Trả lời</div>

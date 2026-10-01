@@ -6,11 +6,11 @@ from typing import Mapping
 
 from .data import Article
 from .pipeline import build_context_docs
-from .prompts import build_messages
+from .prompts import ContextDoc, build_messages
 from .retrieval import Hit, Retriever
 
 
-def sample_context(
+def sample_docs(
     qid: str,
     question: str,
     gold: set[str],
@@ -21,12 +21,12 @@ def sample_context(
     neg_ratio: float = 0.15,
     max_chars: int = 1500,
     seed: int = 13,
-) -> dict:
-    """Return a prompt whose context is gold article(s) + hard negatives (shuffled),
-    or, with probability ``neg_ratio``, hard negatives only ("negative" sample).
+) -> tuple[str, list[ContextDoc]]:
+    """Return ("answerable", gold + hard negatives shuffled) or, with probability
+    ``neg_ratio``, ("negative", hard negatives only).
 
     Seeded per query, so the same query gets the same context for every model
-    being compared.
+    being compared, and the context of a past evaluation can be rebuilt exactly.
     """
     rng = random.Random(f"{seed}-{qid}")
     hits = retriever.search(question, negative_pool)
@@ -47,7 +47,24 @@ def sample_context(
         chosen = gold_hits + negatives[: n_contexts - len(gold_hits)]
         rng.shuffle(chosen)
 
-    docs = build_context_docs(chosen, articles, max_chars)
+    return kind, build_context_docs(chosen, articles, max_chars)
+
+
+def sample_context(
+    qid: str,
+    question: str,
+    gold: set[str],
+    articles: Mapping[str, Article],
+    retriever: Retriever,
+    n_contexts: int = 3,
+    negative_pool: int = 10,
+    neg_ratio: float = 0.15,
+    max_chars: int = 1500,
+    seed: int = 13,
+) -> dict:
+    """Prompt record for SFT / evaluation built from :func:`sample_docs`."""
+    kind, docs = sample_docs(qid, question, gold, articles, retriever, n_contexts, negative_pool,
+                             neg_ratio, max_chars, seed)
     return {
         "id": qid,
         "type": kind,

@@ -24,6 +24,7 @@ class Settings:
     candidates: int = 20  # hits passed to the reranker (20 keeps ~all of the gain of 30, 30% faster)
     context_k: int = 3  # articles given to the LLM
     max_context_chars: int = 1500
+    refusal_threshold: float | None = None  # reranker-score gate, see scripts/tune_refusal_gate.py
 
     llm_base_url: str = "http://localhost:8000/v1"
     llm_model: str = "Qwen/Qwen2.5-3B-Instruct"
@@ -43,6 +44,7 @@ class Settings:
             candidates=int(env("CANDIDATES", cls.candidates)),
             context_k=int(env("CONTEXT_K", cls.context_k)),
             max_context_chars=int(env("MAX_CONTEXT_CHARS", cls.max_context_chars)),
+            refusal_threshold=float(env("REFUSAL_THRESHOLD")) if env("REFUSAL_THRESHOLD") else None,
             llm_base_url=env("LLM_BASE_URL", cls.llm_base_url),
             llm_model=env("LLM_MODEL", cls.llm_model),
             llm_api_key=env("LLM_API_KEY", cls.llm_api_key),

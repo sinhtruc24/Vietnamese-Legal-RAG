@@ -1,0 +1,18 @@
+{
+  "name": "lora_v2",
+  "mode": "oracle",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "adapter": "outputs/qwen-legal-lora_v2/adapter",
+  "n": 150,
+  "n_answerable": 123,
+  "n_negative": 27,
+  "answer_rate": 0.8618,
+  "gold_cite_rate": 0.7805,
+  "cite_precision": 0.7276,
+  "invalid_cite_rate": 0.0,
+  "uncited_rate": 0.0,
+  "refusal_acc": 0.3704,
+  "faithfulness": 0.626,
+  "n_judged": 123,
+  "latency_ms": 11053.1843
+}

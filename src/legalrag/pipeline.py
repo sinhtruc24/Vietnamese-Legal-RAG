@@ -7,7 +7,7 @@ from typing import Mapping, Sequence
 
 from .data import Article, format_citation
 from .generator import Generator
-from .prompts import ContextDoc, build_messages, is_refusal, parse_citations
+from .prompts import REFUSAL, ContextDoc, build_messages, is_refusal, parse_citations
 from .retrieval import CrossEncoderReranker, Hit, Retriever
 
 
@@ -36,6 +36,8 @@ class RAGAnswer:
     citations: list[dict]
     contexts: list[ContextDoc]
     timings_ms: dict[str, float] = field(default_factory=dict)
+    gated: bool = False  # refused by the reranker gate, the LLM was not called
+    top_score: float | None = None  # reranker score of the best article
 
 
 class RAGPipeline:
@@ -48,7 +50,10 @@ class RAGPipeline:
         candidates: int = 30,
         context_k: int = 3,
         max_context_chars: int = 1500,
+        refusal_threshold: float | None = None,
     ):
+        if refusal_threshold is not None and reranker is None:
+            raise ValueError("refusal_threshold is a reranker score: it requires a reranker")
         self.retriever = retriever
         self.generator = generator
         self.articles = articles
@@ -56,6 +61,7 @@ class RAGPipeline:
         self.candidates = candidates
         self.context_k = context_k
         self.max_context_chars = max_context_chars
+        self.refusal_threshold = refusal_threshold
 
     def retrieve(self, question: str, k: int | None = None, timings: dict | None = None) -> list[Hit]:
         k = k or self.context_k
@@ -74,6 +80,12 @@ class RAGPipeline:
         timings: dict[str, float] = {}
         hits = self.retrieve(question, timings=timings)
         docs = build_context_docs(hits, self.articles, self.max_context_chars)
+        top_score = hits[0].score if hits and self.reranker else None
+
+        if self.refusal_threshold is not None and (top_score is None or top_score < self.refusal_threshold):
+            timings["generate"] = 0.0
+            timings["total"] = sum(timings.values())
+            return RAGAnswer(question, REFUSAL, True, [], docs, timings, gated=True, top_score=top_score)
 
         t0 = time.perf_counter()
         text = self.generator.generate(build_messages(question, docs))
@@ -85,4 +97,4 @@ class RAGPipeline:
             {"index": i, "article_id": docs[i - 1].article_id, "citation": docs[i - 1].citation}
             for i in valid
         ]
-        return RAGAnswer(question, text, is_refusal(text), citations, docs, timings)
+        return RAGAnswer(question, text, is_refusal(text), citations, docs, timings, top_score=top_score)

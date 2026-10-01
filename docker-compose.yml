@@ -11,7 +11,7 @@ services:
       - --max-model-len=4096
       - --gpu-memory-utilization=0.85
     volumes:
-      - ./outputs/qwen-legal-lora/adapter:/adapters/legal-lora:ro
+      - ./outputs/qwen-legal-lora_v2/adapter:/adapters/legal-lora:ro  # LoRA v2 (35% mẫu từ chối)
       - hf-cache:/root/.cache/huggingface
     ports:
       - "8000:8000"
@@ -29,6 +29,7 @@ services:
       INDEX_DIR: /app/indexes/full
       RETRIEVER: hybrid
       USE_RERANKER: "true"
+      REFUSAL_THRESHOLD: "0.67"  # reranker gate, chọn trên validation (results/refusal_gate_keep0.85.json)
       LLM_BASE_URL: http://llm:8000/v1
       LLM_MODEL: legal-lora  # or Qwen/Qwen2.5-3B-Instruct for the base model
     volumes:

@@ -288,9 +288,15 @@ class CrossEncoderReranker:
             self.model.model.half()
         self.batch_size = batch_size
 
+    def score(self, query: str, texts: Sequence[str]) -> np.ndarray:
+        """Relevance of each text to the query (bge-reranker: sigmoid, so in [0, 1])."""
+        if not texts:
+            return np.zeros(0, dtype=np.float32)
+        return np.asarray(self.model.predict([(query, t) for t in texts], batch_size=self.batch_size))
+
     def rerank(self, query: str, hits: Sequence[Hit], k: int) -> list[Hit]:
         if not hits:
             return []
-        scores = self.model.predict([(query, h.text) for h in hits], batch_size=self.batch_size)
-        order = np.argsort(-np.asarray(scores))[:k]
+        scores = self.score(query, [h.text for h in hits])
+        order = np.argsort(-scores)[:k]
         return [replace(hits[i], score=float(scores[i])) for i in order]

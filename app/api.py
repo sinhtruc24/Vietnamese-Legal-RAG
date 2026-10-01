@@ -46,6 +46,7 @@ def health() -> dict:
         "status": "ok",
         "retriever": settings.retriever,
         "reranker": settings.reranker_model if settings.use_reranker else None,
+        "refusal_threshold": settings.refusal_threshold if settings.use_reranker else None,
         "llm": settings.llm_model,
     }
 
@@ -75,6 +76,8 @@ def ask(req: AskRequest) -> dict:
         "question": result.question,
         "answer": result.answer,
         "refused": result.refused,
+        "gated": result.gated,
+        "top_score": result.top_score,
         "citations": result.citations,
         "contexts": [asdict(d) for d in result.contexts],
         "timings_ms": {k: round(v, 1) for k, v in result.timings_ms.items()},
