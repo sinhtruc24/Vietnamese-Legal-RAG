@@ -113,7 +113,12 @@ class HFGenerator:
         if adapter:
             from peft import PeftModel
 
-            self.model = PeftModel.from_pretrained(self.model, adapter)
+            try:
+                self.model = PeftModel.from_pretrained(self.model, adapter)
+            except ImportError as exc:
+                if "torchao" in str(exc):  # unused here; an old preinstalled torchao makes peft refuse to load
+                    raise ImportError(f"{exc}\nFix: pip uninstall -y torchao") from exc
+                raise
         self.model.eval()
         self.max_new_tokens = max_new_tokens
 
