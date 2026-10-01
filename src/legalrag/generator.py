@@ -105,8 +105,10 @@ class HFGenerator:
         bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
         self.torch = torch
         self.tokenizer = AutoTokenizer.from_pretrained(model)
+        # One GPU is enough for a 3B model in fp16 (~6 GB) and avoids slow cross-GPU layer splitting.
         self.model = AutoModelForCausalLM.from_pretrained(
-            model, torch_dtype=torch.bfloat16 if bf16 else torch.float16, device_map="auto"
+            model, dtype=torch.bfloat16 if bf16 else torch.float16,
+            device_map={"": 0} if torch.cuda.is_available() else None,
         )
         if adapter:
             from peft import PeftModel

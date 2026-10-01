@@ -1,6 +1,6 @@
 # QLoRA training (GPU: Kaggle T4 / Colab / local CUDA)
 torch>=2.3
-transformers>=4.51
+transformers>=4.56
 datasets>=2.20
 peft>=0.14
 trl>=0.20
