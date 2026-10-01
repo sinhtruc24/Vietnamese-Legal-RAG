@@ -71,18 +71,28 @@ Chia train/val: 846 / 44 mẫu.
 
 `eval_loss` thấp nhất ở cuối epoch 1 rồi đi ngang, nên dùng checkpoint-50; epoch 2 không cải thiện thêm (1 epoch là đủ cho bộ dữ liệu này).
 
-### Sinh câu trả lời (chế độ oracle, 300 câu test, cùng ngữ cảnh cho mọi mô hình)
+### Sinh câu trả lời (chế độ oracle, 150 câu test, cùng ngữ cảnh cho mọi mô hình)
 
-| Mô hình | answer_rate | gold_cite_rate | cite_precision | invalid_cite | refusal_acc | faithfulness |
-|---|---|---|---|---|---|---|
-| Qwen2.5-3B-Instruct (base) | _TODO_ | | | | | |
-| + QLoRA (của mình) | _TODO_ | | | | | |
-| Teacher (tham chiếu) | _TODO_ | | | | | |
+123 câu có điều luật đúng trong ngữ cảnh, 27 câu chỉ có điều luật sai (mô hình nên từ chối).
 
-- **gold_cite_rate:** tỉ lệ câu trả lời có trích dẫn đúng điều luật gold.
-- **invalid_cite:** tỉ lệ câu trả lời trích dẫn nguồn không tồn tại trong ngữ cảnh (bịa nguồn).
-- **refusal_acc:** tỉ lệ từ chối đúng khi ngữ cảnh không chứa điều luật gold.
-- **faithfulness:** chấm bằng LLM-as-judge.
+| Mô hình | Trả lời | **Trích đúng gold** | Độ chính xác trích dẫn | Bịa nguồn | Không trích dẫn | **Từ chối đúng** | Faithfulness* |
+|---|---|---|---|---|---|---|---|
+| Qwen2.5-3B-Instruct (base) | 75.6% | 41.5% | 61.9% | 2.8% | 30.2% | 51.9% | 46.2% (106) |
+| **+ QLoRA (của mình)** | 92.7% | **82.1%** | 68.5% | **0%** | **0%** | 14.8% | 59.1% (137) |
+| Teacher: Gemini 3.5 Flash Lite | 77.2% | 76.4% | 83.5% | 0% | 0% | 77.8% | 97.0% (101) |
+
+\* Faithfulness chấm bằng LLM-as-judge (Gemini 3.1 Flash Lite) trên các câu mô hình **trả lời**; số trong ngoặc là số câu được chấm. Mỗi mô hình từ chối số câu khác nhau nên tập được chấm khác nhau, không so sánh trực tiếp được.
+
+**Nhận xét:**
+- **LoRA học được định dạng trích dẫn rất tốt:** tỉ lệ trích đúng điều luật gold tăng gấp đôi (41.5% lên 82.1%), **vượt cả teacher**; không còn câu nào thiếu trích dẫn (base: 30%) hay trích nguồn không tồn tại.
+- **Nhưng LoRA gần như không biết từ chối** (51.9% xuống 14.8%): khi ngữ cảnh chỉ có điều luật sai cùng chủ đề (hard negatives), mô hình vẫn trả lời dựa trên điều luật đó. Nguyên nhân: mẫu từ chối chỉ chiếm 17% dữ liệu SFT, ít hơn nhiều so với mẫu trả lời.
+- Có trường hợp **lặp cụm từ** khi giải mã tham lam (greedy decoding).
+
+**Hướng cải thiện tiếp theo:** bổ sung mẫu từ chối (miễn phí, không cần gọi teacher) để đạt khoảng 30–35% dữ liệu, thêm `repetition_penalty` khi sinh, train lại 1 epoch.
+
+- **Trích đúng gold:** câu có điều luật đúng trong ngữ cảnh và mô hình trích dẫn đúng điều luật đó.
+- **Bịa nguồn:** trích số thứ tự không tồn tại trong ngữ cảnh.
+- **Từ chối đúng:** ngữ cảnh không chứa điều luật đúng và mô hình trả lời bằng câu từ chối.
 
 ## Cấu trúc
 

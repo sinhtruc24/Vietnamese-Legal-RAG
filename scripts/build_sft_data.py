@@ -61,14 +61,18 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=Path("data/sft"))
     parser.add_argument("--split", default="train")
     parser.add_argument("--retriever", default="bm25", help="source of hard negatives")
-    parser.add_argument("--teacher-base-url", required=True)
-    parser.add_argument("--teacher-model", required=True)
+    parser.add_argument("--teacher-base-url", default=None)
+    parser.add_argument("--teacher-model", default=None)
+    parser.add_argument("--only-negatives", action="store_true",
+                        help="add refusal samples only (no teacher, no API cost); use with --offset to take "
+                             "questions not used yet")
     parser.add_argument("--n-contexts", type=int, default=3)
     parser.add_argument("--negative-pool", type=int, default=10)
     parser.add_argument("--neg-ratio", type=float, default=0.15)
     parser.add_argument("--max-context-chars", type=int, default=1500)
     parser.add_argument("--val-ratio", type=float, default=0.05)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--offset", type=int, default=0, help="skip the first N train questions")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--rpm", type=float, default=None,
                         help="max teacher requests per minute (free tiers: e.g. 4); default unlimited")
@@ -76,10 +80,14 @@ def main() -> None:
                         help="teacher output budget; reasoning models spend part of it thinking")
     parser.add_argument("--seed", type=int, default=13)
     args = parser.parse_args()
+    if args.only_negatives:
+        args.neg_ratio = 1.0
+    elif not (args.teacher_base_url and args.teacher_model):
+        parser.error("--teacher-base-url and --teacher-model are required (unless --only-negatives)")
 
     from legalrag.generator import OpenAICompatibleGenerator, QuotaExhausted
 
-    teacher = OpenAICompatibleGenerator(
+    teacher = None if args.only_negatives else OpenAICompatibleGenerator(
         args.teacher_base_url, args.teacher_model,
         api_key=os.environ.get("TEACHER_API_KEY", "EMPTY"), temperature=0.2, max_tokens=args.max_tokens,
         requests_per_minute=args.rpm,
@@ -90,7 +98,7 @@ def main() -> None:
 
     indexed = bundle.articles.keys()
     qrels = {q: g & indexed for q, g in ds.qrels(args.split).items() if g & indexed}
-    qids = list(qrels)[: args.limit or None]
+    qids = list(qrels)[args.offset: args.offset + args.limit if args.limit else None]
 
     raw_path = args.out_dir / "raw.jsonl"
     done = {row["id"] for row in read_jsonl(raw_path)} if raw_path.exists() else set()
