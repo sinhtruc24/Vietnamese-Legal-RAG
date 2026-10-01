@@ -54,6 +54,23 @@ BM25 chạy trên CPU; dense và reranker chạy trên Kaggle T4, thời gian t�
 - **Từ 30 ứng viên trở lên thì không tăng thêm**, chỉ tốn thêm thời gian. Mức 20 giữ được gần như toàn bộ chất lượng mà nhanh hơn 30%, nên tôi chọn 20 làm mặc định khi demo.
 - **Recall@1 dừng ở khoảng 0.70**, trong khi gần như mọi câu test chỉ có 1 điều luật đúng (mức tối đa đạt được là 0.997). Hướng cải thiện tiếp theo là fine-tune reranker hoặc embedding trên khoảng 2.4K cặp câu hỏi và điều luật đúng của tập train.
 
+### Dữ liệu SFT và fine-tune QLoRA
+
+**Dữ liệu:** 890 mẫu (739 có câu trả lời, 151 mẫu từ chối), distill từ Gemini Flash Lite trên câu hỏi train.
+Câu trả lời của teacher chỉ được giữ khi trích dẫn đúng điều luật gold; khoảng 15% bị loại bởi bộ lọc này.
+Chia train/val: 846 / 44 mẫu.
+
+**Train:** Qwen2.5-3B-Instruct, QLoRA 4-bit NF4, r=16, 7 lớp chiếu (29.9M tham số, 0.96%), 2 × T4 với DDP, 106 bước (2 epoch), khoảng 4 giờ.
+
+| Bước | Epoch | eval_loss | Độ chính xác token (eval) |
+|---|---|---|---|
+| 25 | 0.47 | 0.1848 | 95.2% |
+| **50** | **0.94** | **0.1651** | **95.5%** |
+| 75 | 1.42 | 0.1666 | 95.6% |
+| 100 | 1.89 | 0.1680 | 95.6% |
+
+`eval_loss` thấp nhất ở cuối epoch 1 rồi đi ngang, nên dùng checkpoint-50; epoch 2 không cải thiện thêm (1 epoch là đủ cho bộ dữ liệu này).
+
 ### Sinh câu trả lời (chế độ oracle, 300 câu test, cùng ngữ cảnh cho mọi mô hình)
 
 | Mô hình | answer_rate | gold_cite_rate | cite_precision | invalid_cite | refusal_acc | faithfulness |
@@ -172,7 +189,7 @@ python app/ui.py
 
 - [x] **Tuần 0:** khung project, BM25 + bigram, metrics, test, số liệu baseline BM25
 - [x] **Tuần 1:** dense index bge-m3 trên Kaggle; bảng BM25 / dense / hybrid / +reranker; ablation số ứng viên reranker
-- [ ] **Tuần 2:** tạo dữ liệu SFT (~2K mẫu), kiểm tra tay khoảng 50 mẫu, train QLoRA
+- [x] **Tuần 2:** tạo dữ liệu SFT (890 mẫu), kiểm tra mẫu, train QLoRA trên 2 × T4
 - [ ] **Tuần 3:** đánh giá base với LoRA với teacher; phân tích lỗi (câu nào sai, vì sao); ablation `neg_ratio`
 - [ ] **Tuần 4:** Docker, demo, README hoàn chỉnh, quay GIF demo, đưa lên CV
 
