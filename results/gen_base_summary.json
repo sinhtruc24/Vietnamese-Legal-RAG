@@ -1,0 +1,18 @@
+{
+  "name": "base",
+  "mode": "oracle",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "adapter": null,
+  "n": 150,
+  "n_answerable": 123,
+  "n_negative": 27,
+  "answer_rate": 0.7561,
+  "gold_cite_rate": 0.4146,
+  "cite_precision": 0.6194,
+  "invalid_cite_rate": 0.0283,
+  "uncited_rate": 0.3019,
+  "refusal_acc": 0.5185,
+  "faithfulness": 0.4623,
+  "n_judged": 106,
+  "latency_ms": 7316.4187
+}

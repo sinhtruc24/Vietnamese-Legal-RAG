@@ -10,3 +10,4 @@ data/
 indexes/
 outputs/
 results/gen_*.jsonl
+kaggle_upload/
