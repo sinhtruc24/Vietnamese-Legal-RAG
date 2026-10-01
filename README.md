@@ -245,14 +245,6 @@ uvicorn app.api:app --port 8080
 python app/ui.py
 ```
 
-## Lộ trình 4 tuần
-
-- [x] **Tuần 0:** khung project, BM25 + bigram, metrics, test, số liệu baseline BM25
-- [x] **Tuần 1:** dense index bge-m3 trên Kaggle; bảng BM25 / dense / hybrid / +reranker; ablation số ứng viên reranker
-- [x] **Tuần 2:** tạo dữ liệu SFT (890 mẫu), kiểm tra mẫu, train QLoRA trên 2 × T4
-- [x] **Tuần 3:** đánh giá base / LoRA / teacher; phân tích lỗi; ablation tỉ lệ mẫu từ chối (17% và 35%)
-- [ ] **Tuần 4:** Docker, demo, README hoàn chỉnh, quay GIF demo, đưa lên CV
-
 ## Ghi chú kỹ thuật
 
 - **Chunking:** một số điều luật dài hơn 100K ký tự. Nếu không chunk, embedding model sẽ âm thầm cắt mất phần sau. Điểm của một điều luật là điểm của chunk tốt nhất (max-pooling), và chunk đó được đưa vào reranker/LLM.
